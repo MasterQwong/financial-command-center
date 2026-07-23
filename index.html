@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Financial Command Center</title>
+<style>
+:root{
+  --bg:#0f172a; --panel:#111827; --panel2:#1f2937; --text:#f8fafc;
+  --muted:#94a3b8; --accent:#38bdf8; --good:#34d399; --warn:#f59e0b; --bad:#fb7185;
+  --border:#334155;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+header{position:sticky;top:0;z-index:5;background:rgba(15,23,42,.96);border-bottom:1px solid var(--border);padding:16px}
+header h1{margin:0;font-size:1.25rem}
+header p{margin:4px 0 0;color:var(--muted);font-size:.9rem}
+nav{display:flex;gap:8px;overflow:auto;padding:10px 16px;border-bottom:1px solid var(--border);background:#0b1220}
+nav button{border:1px solid var(--border);background:var(--panel);color:var(--text);padding:10px 14px;border-radius:999px;white-space:nowrap;cursor:pointer}
+nav button.active{background:var(--accent);color:#082f49;border-color:var(--accent);font-weight:700}
+main{max-width:1100px;margin:auto;padding:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.card h3{margin:0 0 10px;font-size:1rem;color:#e2e8f0}
+.big{font-size:1.8rem;font-weight:800}
+.muted{color:var(--muted)}
+.good{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+section{display:none} section.active{display:block}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;border-bottom:1px solid var(--border);text-align:left}
+th{color:var(--muted);font-size:.85rem}
+input,select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#0b1220;color:var(--text)}
+.btn{background:var(--accent);color:#082f49;border:0;padding:11px 14px;border-radius:10px;font-weight:700;cursor:pointer}
+.btn.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.progress{height:12px;background:#0b1220;border-radius:999px;overflow:hidden;border:1px solid var(--border)}
+.progress span{display:block;height:100%;background:var(--accent)}
+.note{padding:12px;border-left:4px solid var(--warn);background:#1e293b;border-radius:8px}
+footer{padding:28px 16px;color:var(--muted);text-align:center;font-size:.8rem}
+@media(max-width:640px){.row{grid-template-columns:1fr}.big{font-size:1.5rem}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Financial Command Center</h1>
+  <p>Mission: retire at 65 with every dollar assigned a job.</p>
+</header>
+<nav>
+  <button class="tab active" data-tab="dashboard">Dashboard</button>
+  <button class="tab" data-tab="paycheck">Paycheck Router</button>
+  <button class="tab" data-tab="vaults">SoFi Vaults</button>
+  <button class="tab" data-tab="debts">Debt Plan</button>
+  <button class="tab" data-tab="goals">Goals</button>
+  <button class="tab" data-tab="settings">Settings</button>
+</nav>
+<main>
+<section id="dashboard" class="active">
+  <div class="grid">
+    <div class="card"><h3>Biweekly Take-Home</h3><div class="big" id="kpiPay">$0.00</div><div class="muted">From latest pay stub</div></div>
+    <div class="card"><h3>401(k)</h3><div class="big good" id="kpi401">$0</div><div class="muted">Current retirement balance</div></div>
+    <div class="card"><h3>IRS Debt</h3><div class="big bad" id="kpiIRS">$0</div><div class="muted">Primary debt target</div></div>
+    <div class="card"><h3>Mortgage</h3><div class="big" id="kpiMortgage">$0</div><div class="muted">4.125% interest rate</div></div>
+  </div>
+  <div class="grid" style="margin-top:14px">
+    <div class="card">
+      <h3>Retirement Objective</h3>
+      <div class="big">Age 65</div>
+      <p class="muted">Work after 65 should be optional, not required.</p>
+    </div>
+    <div class="card">
+      <h3>Social Security at 70</h3>
+      <div class="big good">Enter estimate</div>
+      <p class="muted">Illustrates the value of a bridge strategy from 65–70.</p>
+    </div>
+    <div class="card">
+      <h3>Current Rule</h3>
+      <div class="note">Amazon is necessities only. Health-product impulse purchases are out.</div>
+    </div>
+  </div>
+</section>
+
+<section id="paycheck">
+  <div class="card">
+    <h3>Paycheck Router</h3>
+    <p class="muted">Edit the amounts, then press Save. The remainder is calculated automatically.</p>
+    <table>
+      <thead><tr><th>Destination</th><th>Per Paycheck</th></tr></thead>
+      <tbody id="routerRows"></tbody>
+      <tfoot><tr><th>Unassigned / Buffer</th><th id="remaining">$0.00</th></tr></tfoot>
+    </table>
+    <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn" onclick="saveAll()">Save</button>
+      <button class="btn secondary" onclick="resetDefaults()">Reset</button>
+    </div>
+  </div>
+</section>
+
+
+<section id="vaults">
+  <div class="grid">
+    <div class="card">
+      <h3>6-Month Emergency Fund</h3>
+      <label>Current Balance</label>
+      <input id="vaultEmergency" type="number" step="0.01"/>
+      <label>Target Balance</label>
+      <input id="vaultEmergencyTarget" type="number" step="0.01"/>
+      <div class="progress" style="margin-top:12px"><span id="vaultEmergencyBar" style="width:0%"></span></div>
+      <p class="muted" id="vaultEmergencyText"></p>
+    </div>
+    <div class="card">
+      <h3>Bill Pay</h3>
+      <label>Current Balance</label>
+      <input id="vaultBillPay" type="number" step="0.01"/>
+      <label>Target Balance</label>
+      <input id="vaultBillPayTarget" type="number" step="0.01"/>
+      <div class="progress" style="margin-top:12px"><span id="vaultBillPayBar" style="width:0%"></span></div>
+      <p class="muted" id="vaultBillPayText"></p>
+    </div>
+    <div class="card">
+      <h3>The Family Fund</h3>
+      <label>Current Balance</label>
+      <input id="vaultFamily" type="number" step="0.01"/>
+      <label>Target Balance</label>
+      <input id="vaultFamilyTarget" type="number" step="0.01"/>
+      <div class="progress" style="margin-top:12px"><span id="vaultFamilyBar" style="width:0%"></span></div>
+      <p class="muted" id="vaultFamilyText"></p>
+    </div>
+  </div>
+  <div style="margin-top:14px">
+    <button class="btn" onclick="saveAll()">Save Vault Balances</button>
+  </div>
+</section>
+
+<section id="debts">
+  <div class="grid">
+    <div class="card"><h3>IRS</h3><label>Balance</label><input id="irsBalance" type="number"/><label>Monthly Payment</label><input id="irsPayment" type="number"/><p class="muted" id="irsMonths"></p></div>
+    <div class="card"><h3>Mortgage</h3><label>Balance</label><input id="mortBalance" type="number"/><label>Monthly Payment</label><input id="mortPayment" type="number"/><p class="muted">Escrow means payoff savings are less than the full payment.</p></div>
+    <div class="card"><h3>Student Loan</h3><label>Balance</label><input id="studentBalance" type="number"/><label>Monthly Payment</label><input id="studentPayment" type="number"/></div>
+    <div class="card"><h3>401(k) Loan</h3><label>Balance</label><input id="loan401Balance" type="number"/><label>Biweekly Payment</label><input id="loan401Payment" type="number"/><p class="muted">Current plan: let it amortize unless circumstances change.</p></div>
+  </div>
+  <div style="margin-top:14px"><button class="btn" onclick="saveAll()">Save Debt Data</button></div>
+</section>
+
+<section id="goals">
+  <div class="card">
+    <h3>Priority Order</h3>
+    <ol>
+      <li>Stop creating new IRS debt.</li>
+      <li>Maintain retirement contributions.</li>
+      <li>Eliminate current IRS debt.</li>
+      <li>Fund Roth IRA and named savings goals.</li>
+      <li>Protect intentional family spending.</li>
+      <li>Remove low-value spending.</li>
+    </ol>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h3>Financial Definition of Success</h3>
+    <blockquote style="margin:0;color:#e2e8f0;font-size:1.1rem;line-height:1.6">
+      “I will know I have become financially successful when I don't owe anyone or any place a single dollar.”
+    </blockquote>
+  </div>
+</section>
+
+<section id="settings">
+  <div class="card">
+    <h3>Core Values</h3>
+    <div class="row">
+      <div><label>Biweekly Net Pay</label><input id="netPay" type="number" step="0.01"/></div>
+      <div><label>Target Retirement Age</label><input id="retAge" type="number"/></div>
+    </div>
+    <div style="margin-top:14px"><button class="btn" onclick="saveAll()">Save Settings</button></div>
+    <p class="muted">Data is stored locally in this browser using localStorage. Export/import can be added next.</p>
+  </div>
+</section>
+</main>
+<footer>Prototype v0.1 — local-first, mobile-friendly, no cloud sync yet.</footer>
+<script>
+const defaults = {
+  netPay:0, retAge:65, retirement401:0, socialSecurity70:0,
+  router:{
+    "Bill Pay Vault":0,
+    "Roth IRA":0,
+    "Emergency Vault":0,
+    "Vacation Vault":0,
+    "Family Fund":0,
+    "Golf Fund":0,
+    "Amazon Necessities":0
+  },
+  vaults:{
+    vaultEmergency:0,vaultEmergencyTarget:0,
+    vaultBillPay:0,vaultBillPayTarget:0,
+    vaultFamily:0,vaultFamilyTarget:0
+  },
+  debts:{
+    irsBalance:0,irsPayment:0,
+    mortBalance:0,mortPayment:0,
+    studentBalance:0,studentPayment:0,
+    loan401Balance:0,loan401Payment:0
+  }
+};
+
+const saved = JSON.parse(localStorage.getItem("fcc_state") || "null") || {};
+let state = {
+  ...defaults,
+  ...saved,
+  router: {...defaults.router, ...(saved.router || {})},
+  vaults: {...defaults.vaults, ...(saved.vaults || {})},
+  debts: {...defaults.debts, ...(saved.debts || {})}
+};
+
+
+function money(n){return Number(n||0).toLocaleString(undefined,{style:"currency",currency:"USD"})}
+function renderRouter(){
+  const body=document.getElementById("routerRows"); body.innerHTML="";
+  Object.entries(state.router).forEach(([k,v])=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${k}</td><td><input type="number" step="0.01" data-router="${k}" value="${v}"></td>`;
+    body.appendChild(tr);
+  });
+  document.querySelectorAll("[data-router]").forEach(el=>el.addEventListener("input",calcRemaining));
+  calcRemaining();
+}
+function calcRemaining(){
+  let used=0;
+  document.querySelectorAll("[data-router]").forEach(el=>used+=Number(el.value||0));
+  document.getElementById("remaining").textContent=money(Number(document.getElementById("netPay").value||state.netPay)-used);
+}
+function loadFields(){
+  document.getElementById("netPay").value=state.netPay;
+  document.getElementById("retAge").value=state.retAge;
+  Object.keys(state.vaults).forEach(k=>document.getElementById(k).value=state.vaults[k]);
+  Object.keys(state.debts).forEach(k=>document.getElementById(k).value=state.debts[k]);
+  renderRouter(); updateDebtText(); updateVaults();
+}
+
+function updateVaults(){
+  const defs=[
+    ["vaultEmergency","vaultEmergencyTarget","vaultEmergencyBar","vaultEmergencyText"],
+    ["vaultBillPay","vaultBillPayTarget","vaultBillPayBar","vaultBillPayText"],
+    ["vaultFamily","vaultFamilyTarget","vaultFamilyBar","vaultFamilyText"]
+  ];
+  defs.forEach(([balId,targetId,barId,textId])=>{
+    const bal=Number(document.getElementById(balId).value||0);
+    const target=Number(document.getElementById(targetId).value||0);
+    const pct=target>0?Math.min(100,(bal/target)*100):0;
+    document.getElementById(barId).style.width=pct+"%";
+    document.getElementById(textId).textContent=target>0
+      ? `${money(bal)} of ${money(target)} (${pct.toFixed(0)}%)`
+      : `${money(bal)} saved`;
+  });
+}
+
+function updateDebtText(){
+  const b=Number(document.getElementById("irsBalance").value||0), p=Number(document.getElementById("irsPayment").value||0);
+  document.getElementById("irsMonths").textContent=p>0?`Ignoring interest and penalties: about ${Math.ceil(b/p)} months.`:"";
+}
+function saveAll(){
+  state.netPay=Number(document.getElementById("netPay").value||0);
+  state.retAge=Number(document.getElementById("retAge").value||65);
+  document.querySelectorAll("[data-router]").forEach(el=>state.router[el.dataset.router]=Number(el.value||0));
+  Object.keys(state.vaults).forEach(k=>state.vaults[k]=Number(document.getElementById(k).value||0));
+  Object.keys(state.debts).forEach(k=>state.debts[k]=Number(document.getElementById(k).value||0));
+  localStorage.setItem("fcc_state",JSON.stringify(state));
+  document.getElementById("kpiPay").textContent=money(state.netPay);
+  document.getElementById("kpiIRS").textContent=money(state.debts.irsBalance);
+  document.getElementById("kpiMortgage").textContent=money(state.debts.mortBalance);
+  calcRemaining(); updateDebtText(); updateVaults();
+  alert("Saved locally.");
+}
+function resetDefaults(){
+  state=JSON.parse(JSON.stringify(defaults)); localStorage.setItem("fcc_state",JSON.stringify(state)); loadFields();
+}
+document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{
+  document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
+  document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
+  btn.classList.add("active"); document.getElementById(btn.dataset.tab).classList.add("active");
+}));
+document.getElementById("irsBalance").addEventListener("input",updateDebtText);
+document.getElementById("irsPayment").addEventListener("input",updateDebtText);
+["vaultEmergency","vaultEmergencyTarget","vaultBillPay","vaultBillPayTarget","vaultFamily","vaultFamilyTarget"].forEach(id=>document.getElementById(id).addEventListener("input",updateVaults));
+loadFields();
+
+window.addEventListener("error", function(e){
+  const box=document.createElement("div");
+  box.style.cssText="position:fixed;bottom:10px;left:10px;right:10px;background:#7f1d1d;color:white;padding:12px;border-radius:10px;z-index:9999";
+  box.textContent="The app hit an error: "+e.message;
+  document.body.appendChild(box);
+});
+</script>
+</body>
+</html>
