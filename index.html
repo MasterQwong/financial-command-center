@@ -37,6 +37,9 @@ footer{padding:30px 16px;text-align:center;color:var(--muted);font-size:.8rem}
 <button class="tab" data-tab="vaults">SoFi Vaults</button>
 <button class="tab" data-tab="paycheck">Paycheck Router</button>
 <button class="tab" data-tab="debts">Debt Plan</button>
+<button class="tab" data-tab="creditcards">Credit Cards</button>
+<button class="tab" data-tab="credit">Credit Score</button>
+<button class="tab" data-tab="bills">Monthly Bills</button>
 <button class="tab" data-tab="retirement">Retirement</button>
 <button class="tab" data-tab="settings">Settings & Backup</button>
 </nav>
@@ -54,6 +57,9 @@ footer{padding:30px 16px;text-align:center;color:var(--muted);font-size:.8rem}
 <div class="card"><h3>Unassigned Per Paycheck</h3><div class="big warn" id="kpiBuffer">$0.00</div><div class="muted">After planned transfers</div></div>
 <div class="card"><h3>IRS Payoff Estimate</h3><div class="big" id="kpiIRSMonths">—</div><div class="muted">Ignoring future interest and penalties</div></div>
 <div class="card"><h3>Retirement Goal</h3><div class="big">Age <span id="kpiAge">65</span></div><div class="muted">Work after 65 should be optional</div></div>
+<div class="card"><h3>Credit Card Statements</h3><div class="big" id="kpiCards">$0.00</div><div class="muted">Current month statement total</div></div>
+<div class="card"><h3>Credit Score</h3><div class="big" id="kpiCreditScore">—</div><div class="muted">Latest monthly entry</div></div>
+<div class="card"><h3>Bills Paid</h3><div class="big" id="kpiBillsPaid">0 / 0</div><div class="muted">Current month checklist</div></div>
 </div>
 </section>
 
@@ -75,6 +81,56 @@ footer{padding:30px 16px;text-align:center;color:var(--muted);font-size:.8rem}
 <section id="debts">
 <div class="grid" id="debtCards"></div>
 <div class="actions"><button class="btn" onclick="save()">Save Debts</button></div>
+</section>
+
+
+<section id="creditcards">
+<div class="card">
+<h3>Monthly Credit Card Statements</h3>
+<p class="muted">Enter each card when the statement arrives. These values are monthly statement snapshots, not transaction-level tracking.</p>
+<table>
+<thead><tr><th>Card</th><th>Statement Balance</th><th>Minimum Due</th><th>Due Date</th><th>Paid?</th></tr></thead>
+<tbody id="cardRows"></tbody>
+</table>
+<div class="actions"><button class="btn" onclick="save()">Save Credit Cards</button></div>
+</div>
+</section>
+
+<section id="credit">
+<div class="grid">
+<div class="card">
+<h3>Monthly Credit Score</h3>
+<label>Score</label><input id="creditScoreCurrent" type="number" min="300" max="850">
+<label>Source</label><input id="creditScoreSource" type="text" placeholder="Experian, CreditWise, etc.">
+<label>Date</label><input id="creditScoreDate" type="date">
+<div class="actions"><button class="btn" onclick="addCreditScore()">Add Monthly Entry</button></div>
+</div>
+<div class="card">
+<h3>Latest Score</h3>
+<div class="big" id="creditScoreLatest">—</div>
+<p class="muted" id="creditScoreLatestMeta">No entries yet.</p>
+</div>
+</div>
+<div class="card" style="margin-top:14px">
+<h3>Score History</h3>
+<table><thead><tr><th>Date</th><th>Score</th><th>Source</th><th></th></tr></thead><tbody id="creditScoreRows"></tbody></table>
+</div>
+</section>
+
+<section id="bills">
+<div class="card">
+<h3>Monthly Bill Checklist</h3>
+<div class="row">
+<div><label>Current Month</label><input id="billMonth" type="month"></div>
+<div><label>Add a Bill</label><div style="display:flex;gap:8px"><input id="newBillName" type="text" placeholder="Bill name"><button class="btn" onclick="addBill()">Add</button></div></div>
+</div>
+<table><thead><tr><th>Paid?</th><th>Bill</th><th>Amount</th><th>Due Day</th><th></th></tr></thead><tbody id="billRows"></tbody></table>
+<div class="actions">
+<button class="btn" onclick="save()">Save Checklist</button>
+<button class="btn secondary" onclick="clearBillsMonth()">Clear Month</button>
+</div>
+<p class="muted small">Clear Month resets only the checkmarks, amounts, and payment dates so the same bill list can be reused next month.</p>
+</div>
 </section>
 
 <section id="retirement">
@@ -116,10 +172,26 @@ const defaults={
   {id:"student",name:"Student Loan",balance:0,payment:0,note:"Education debt"},
   {id:"loan401",name:"401(k) Loan",balance:0,payment:0,note:"Biweekly payment"}
  ],
+ creditCards:[
+  {id:"sofi",name:"SoFi Credit Card",statementBalance:0,minimumDue:0,dueDate:"",paid:false},
+  {id:"quicksilver",name:"Capital One Quicksilver",statementBalance:0,minimumDue:0,dueDate:"",paid:false},
+  {id:"ventureone",name:"Capital One VentureOne",statementBalance:0,minimumDue:0,dueDate:"",paid:false},
+  {id:"savor",name:"Capital One Savor",statementBalance:0,minimumDue:0,dueDate:"",paid:false},
+  {id:"amex",name:"American Express",statementBalance:0,minimumDue:0,dueDate:"",paid:false}
+ ],
+ creditScores:[],
+ billMonth:"",
+ monthlyBills:[
+  {id:"mortgage",name:"Rocket Mortgage",amount:0,dueDay:1,paid:false,paidDate:""},
+  {id:"irs",name:"IRS",amount:0,dueDay:1,paid:false,paidDate:""},
+  {id:"student",name:"Student Loan",amount:0,dueDay:1,paid:false,paidDate:""},
+  {id:"verizon",name:"Verizon",amount:0,dueDay:1,paid:false,paidDate:""},
+  {id:"internet",name:"Internet",amount:0,dueDay:1,paid:false,paidDate:""}
+ ],
  retirement:{ret401:0,ret401Contribution:0,rothBalance:0,rothContribution:0,ss62:0,ss67:0,ss70:0,retAge:65}
 };
 let state=merge(defaults,JSON.parse(localStorage.getItem("fcc_v1")||"null")||{});
-function merge(base,saved){return {...base,...saved,vaults:saved.vaults||base.vaults,router:saved.router||base.router,debts:saved.debts||base.debts,retirement:{...base.retirement,...(saved.retirement||{})}}}
+function merge(base,saved){return {...base,...saved,vaults:saved.vaults||base.vaults,router:saved.router||base.router,debts:saved.debts||base.debts,creditCards:saved.creditCards||base.creditCards,creditScores:saved.creditScores||base.creditScores,monthlyBills:saved.monthlyBills||base.monthlyBills,billMonth:saved.billMonth||base.billMonth,retirement:{...base.retirement,...(saved.retirement||{})}}}
 function money(n){return Number(n||0).toLocaleString(undefined,{style:"currency",currency:"USD"})}
 function byId(id){return document.getElementById(id)}
 function renderVaults(){
@@ -132,6 +204,57 @@ function renderRouter(){
 function renderDebts(){
  byId("debtCards").innerHTML=state.debts.map(d=>`<div class="card"><h3>${d.name}</h3><label>Balance</label><input data-debt="${d.id}" data-field="balance" type="number" step="0.01" value="${d.balance}"><label>${d.id==="loan401"?"Biweekly":"Monthly"} Payment</label><input data-debt="${d.id}" data-field="payment" type="number" step="0.01" value="${d.payment}"><p class="muted">${d.note}</p></div>`).join("");
 }
+
+function renderCreditCards(){
+ byId("cardRows").innerHTML=state.creditCards.map((c,i)=>`<tr>
+ <td><input data-card="${i}" data-field="name" value="${c.name}"></td>
+ <td><input data-card="${i}" data-field="statementBalance" type="number" step="0.01" value="${c.statementBalance}"></td>
+ <td><input data-card="${i}" data-field="minimumDue" type="number" step="0.01" value="${c.minimumDue}"></td>
+ <td><input data-card="${i}" data-field="dueDate" type="date" value="${c.dueDate||""}"></td>
+ <td><input data-card="${i}" data-field="paid" type="checkbox" ${c.paid?"checked":""}></td>
+ </tr>`).join("");
+}
+function renderCreditScores(){
+ const scores=[...state.creditScores].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+ byId("creditScoreRows").innerHTML=scores.map((s,i)=>`<tr><td>${s.date||""}</td><td>${s.score}</td><td>${s.source||""}</td><td><button class="btn secondary" onclick="deleteCreditScore('${s.id}')">Delete</button></td></tr>`).join("");
+ const latest=scores[0];
+ byId("creditScoreLatest").textContent=latest?latest.score:"—";
+ byId("creditScoreLatestMeta").textContent=latest?`${latest.date||""}${latest.source?" · "+latest.source:""}`:"No entries yet.";
+}
+function addCreditScore(){
+ const score=Number(byId("creditScoreCurrent").value||0), source=byId("creditScoreSource").value||"", date=byId("creditScoreDate").value||new Date().toISOString().slice(0,10);
+ if(score<300||score>850){alert("Enter a score between 300 and 850.");return}
+ state.creditScores.push({id:Date.now().toString(),score,source,date});
+ byId("creditScoreCurrent").value="";byId("creditScoreSource").value="";byId("creditScoreDate").value="";
+ localStorage.setItem("fcc_v1",JSON.stringify(state));renderCreditScores();refresh();
+}
+function deleteCreditScore(id){
+ state.creditScores=state.creditScores.filter(s=>s.id!==id);localStorage.setItem("fcc_v1",JSON.stringify(state));renderCreditScores();refresh();
+}
+function renderBills(){
+ if(!state.billMonth) state.billMonth=new Date().toISOString().slice(0,7);
+ byId("billMonth").value=state.billMonth;
+ byId("billRows").innerHTML=state.monthlyBills.map((b,i)=>`<tr>
+ <td><input data-bill="${i}" data-field="paid" type="checkbox" ${b.paid?"checked":""}></td>
+ <td><input data-bill="${i}" data-field="name" value="${b.name}"></td>
+ <td><input data-bill="${i}" data-field="amount" type="number" step="0.01" value="${b.amount}"></td>
+ <td><input data-bill="${i}" data-field="dueDay" type="number" min="1" max="31" value="${b.dueDay}"></td>
+ <td><button class="btn secondary" onclick="deleteBill(${i})">Remove</button></td></tr>`).join("");
+}
+function addBill(){
+ const name=byId("newBillName").value.trim();if(!name)return;
+ state.monthlyBills.push({id:Date.now().toString(),name,amount:0,dueDay:1,paid:false,paidDate:""});
+ byId("newBillName").value="";renderBills();
+}
+function deleteBill(i){state.monthlyBills.splice(i,1);renderBills();save();}
+function clearBillsMonth(){
+ const answer=prompt("Are you sure you want to clear this month's bill checklist? Type Y or N.");
+ if(!answer||answer.trim().toUpperCase()!=="Y"){alert("Nothing was cleared.");return}
+ state.monthlyBills.forEach(b=>{b.paid=false;b.amount=0;b.paidDate=""});
+ const d=new Date();d.setMonth(d.getMonth()+1);state.billMonth=d.toISOString().slice(0,7);
+ localStorage.setItem("fcc_v1",JSON.stringify(state));renderBills();refresh();alert("Checklist cleared for the next month.");
+}
+
 function calcBuffer(){
  let used=0;document.querySelectorAll("[data-router]").forEach(x=>used+=Number(x.value||0));
  const b=Number(byId("netPay").value||state.netPay)-used;byId("routerBuffer").textContent=money(b);byId("kpiBuffer").textContent=money(b);
@@ -139,13 +262,16 @@ function calcBuffer(){
 function load(){
  byId("netPay").value=state.netPay;byId("ownerName").value=state.ownerName||"";
  Object.entries(state.retirement).forEach(([k,v])=>{if(byId(k))byId(k).value=v});
- renderVaults();renderRouter();renderDebts();refresh();
+ renderVaults();renderRouter();renderDebts();renderCreditCards();renderCreditScores();renderBills();refresh();
 }
 function collect(){
  state.netPay=Number(byId("netPay").value||0);state.ownerName=byId("ownerName").value||"";
  document.querySelectorAll("[data-vault]").forEach(x=>{const v=state.vaults.find(v=>v.id===x.dataset.vault);v[x.dataset.field]=Number(x.value||0)});
  document.querySelectorAll("[data-router]").forEach(x=>state.router[Number(x.dataset.router)].amount=Number(x.value||0));
  document.querySelectorAll("[data-debt]").forEach(x=>{const d=state.debts.find(d=>d.id===x.dataset.debt);d[x.dataset.field]=Number(x.value||0)});
+ document.querySelectorAll("[data-card]").forEach(x=>{const c=state.creditCards[Number(x.dataset.card)];c[x.dataset.field]=x.type==="checkbox"?x.checked:(x.type==="number"?Number(x.value||0):x.value)});
+ document.querySelectorAll("[data-bill]").forEach(x=>{const b=state.monthlyBills[Number(x.dataset.bill)];b[x.dataset.field]=x.type==="checkbox"?x.checked:(x.type==="number"?Number(x.value||0):x.value)});
+ state.billMonth=byId("billMonth").value||state.billMonth;
  Object.keys(state.retirement).forEach(k=>{if(byId(k))state.retirement[k]=Number(byId(k).value||0)});
 }
 function save(){collect();localStorage.setItem("fcc_v1",JSON.stringify(state));renderVaults();refresh();alert("Saved on this device.");}
@@ -155,7 +281,10 @@ function refresh(){
  byId("kpiIRS").textContent=money(debt("irs").balance);byId("kpiMortgage").textContent=money(debt("mortgage").balance);
  byId("kpiVaults").textContent=money(state.vaults.reduce((s,v)=>s+Number(v.balance||0),0));byId("kpiAge").textContent=state.retirement.retAge||65;
  byId("kpiIRSMonths").textContent=debt("irs").payment>0?Math.ceil(debt("irs").balance/debt("irs").payment)+" months":"—";
- const hasData=state.netPay||state.retirement.ret401||state.debts.some(d=>d.balance)||state.vaults.some(v=>v.balance);byId("firstRun").style.display=hasData?"none":"block";
+ const cardTotal=state.creditCards.reduce((s,c)=>s+Number(c.statementBalance||0),0);byId("kpiCards").textContent=money(cardTotal);
+ const scores=[...state.creditScores].sort((a,b)=>String(b.date).localeCompare(String(a.date)));byId("kpiCreditScore").textContent=scores[0]?scores[0].score:"—";
+ const paidCount=state.monthlyBills.filter(b=>b.paid).length;byId("kpiBillsPaid").textContent=`${paidCount} / ${state.monthlyBills.length}`;
+ const hasData=state.netPay||state.retirement.ret401||state.debts.some(d=>d.balance)||state.vaults.some(v=>v.balance)||cardTotal||scores.length;byId("firstRun").style.display=hasData?"none":"block";
  calcBuffer();
 }
 function exportData(){collect();const b=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download="financial-command-center-private-backup.json";a.click();URL.revokeObjectURL(u)}
