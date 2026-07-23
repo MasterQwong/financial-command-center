@@ -54,7 +54,7 @@ footer{padding:28px 16px;color:var(--muted);text-align:center;font-size:.8rem}
   <button class="tab" data-tab="settings">Settings</button>
 </nav>
 <main>
-<section id="dashboard" class="active">
+<section id="dashboard" class="active"><div class="note" id="setupNote" style="margin-bottom:14px">First-time setup: open Settings, enter your balances and income, then press Save Settings. Your data stays in this browser.</div>
   <div class="grid">
     <div class="card"><h3>Biweekly Take-Home</h3><div class="big" id="kpiPay">$0.00</div><div class="muted">From latest pay stub</div></div>
     <div class="card"><h3>401(k)</h3><div class="big good" id="kpi401">$0</div><div class="muted">Current retirement balance</div></div>
@@ -168,7 +168,11 @@ footer{padding:28px 16px;color:var(--muted);text-align:center;font-size:.8rem}
       <div><label>Biweekly Net Pay</label><input id="netPay" type="number" step="0.01"/></div>
       <div><label>Target Retirement Age</label><input id="retAge" type="number"/></div>
     </div>
-    <div style="margin-top:14px"><button class="btn" onclick="saveAll()">Save Settings</button></div>
+<div class="row" style="margin-top:12px">
+  <div><label>401(k) Balance</label><input id="retirement401" type="number" step="0.01"/></div>
+  <div><label>Social Security at 70 (Monthly)</label><input id="socialSecurity70" type="number" step="0.01"/></div>
+</div>
+    <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn" onclick="saveAll()">Save Settings</button><button class="btn secondary" onclick="exportData()">Export Backup</button><label class="btn secondary">Import Backup<input id="importFile" type="file" accept=".json" style="display:none"></label></div>
     <p class="muted">Data is stored locally in this browser using localStorage. Export/import can be added next.</p>
   </div>
 </section>
@@ -228,6 +232,8 @@ function calcRemaining(){
 function loadFields(){
   document.getElementById("netPay").value=state.netPay;
   document.getElementById("retAge").value=state.retAge;
+  document.getElementById("retirement401").value=state.retirement401 || 0;
+  document.getElementById("socialSecurity70").value=state.socialSecurity70 || 0;
   Object.keys(state.vaults).forEach(k=>document.getElementById(k).value=state.vaults[k]);
   Object.keys(state.debts).forEach(k=>document.getElementById(k).value=state.debts[k]);
   renderRouter(); updateDebtText(); updateVaults();
@@ -257,6 +263,8 @@ function updateDebtText(){
 function saveAll(){
   state.netPay=Number(document.getElementById("netPay").value||0);
   state.retAge=Number(document.getElementById("retAge").value||65);
+  state.retirement401=Number(document.getElementById("retirement401").value||0);
+  state.socialSecurity70=Number(document.getElementById("socialSecurity70").value||0);
   document.querySelectorAll("[data-router]").forEach(el=>state.router[el.dataset.router]=Number(el.value||0));
   Object.keys(state.vaults).forEach(k=>state.vaults[k]=Number(document.getElementById(k).value||0));
   Object.keys(state.debts).forEach(k=>state.debts[k]=Number(document.getElementById(k).value||0));
@@ -264,12 +272,30 @@ function saveAll(){
   document.getElementById("kpiPay").textContent=money(state.netPay);
   document.getElementById("kpiIRS").textContent=money(state.debts.irsBalance);
   document.getElementById("kpiMortgage").textContent=money(state.debts.mortBalance);
+  document.getElementById("kpi401").textContent=money(state.retirement401 || 0);
   calcRemaining(); updateDebtText(); updateVaults();
   alert("Saved locally.");
 }
 function resetDefaults(){
   state=JSON.parse(JSON.stringify(defaults)); localStorage.setItem("fcc_state",JSON.stringify(state)); loadFields();
 }
+
+function exportData(){
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download="financial-command-center-backup.json"; a.click();
+  URL.revokeObjectURL(url);
+}
+document.getElementById("importFile").addEventListener("change", async (e)=>{
+  const file=e.target.files[0]; if(!file) return;
+  try{
+    const imported=JSON.parse(await file.text());
+    state={...defaults,...imported,router:{...defaults.router,...(imported.router||{})},vaults:{...defaults.vaults,...(imported.vaults||{})},debts:{...defaults.debts,...(imported.debts||{})}};
+    localStorage.setItem("fcc_state",JSON.stringify(state));
+    loadFields(); saveAll();
+  }catch(err){ alert("That backup file could not be imported."); }
+});
 document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{
   document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
   document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
